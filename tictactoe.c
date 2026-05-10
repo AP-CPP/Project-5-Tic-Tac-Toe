@@ -9,3 +9,4 @@ static const int WIN_CONDITIONS[8][3]{
   {0, 4, 8}, {2, 4, 6}
 }; /* TOtal of 8 possible ways to win tic-tac-toe
       first set are the rows then columns and the last two are the diagonals*/
+
