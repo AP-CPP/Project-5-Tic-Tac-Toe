@@ -84,3 +84,20 @@ static void end_game(struct mosquitto *m, const char *status) {
     printf("Game over: %s\n", status);
 }
 
+static int parse_move(const char *payload, char *player, char *pos) {
+    // Checking to see if the player entered a vaild square and "x"
+    if (strlen(payload) < 4) return -1;
+    // Checking to see if the seperator to chose square is a :
+    if (payload[1] != ':')   return -1;
+    // Getting the first letter
+    char p = payload[0];
+    // Ascii converision for upper case
+    if (p >= 'a' && p <= 'z') p -= 32;
+    // Only allows x or o
+    if (p != 'X' && p != 'O') return -1;
+    *player = p;
+    pos[0] = payload[2];
+    pos[1] = payload[3];
+    pos[2] = '\0';
+    return 0;
+}
