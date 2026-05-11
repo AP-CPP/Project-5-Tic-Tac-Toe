@@ -1,4 +1,4 @@
-// Importaing libraries 
+// Importing libraries 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -37,14 +37,42 @@ static const char *turn_status(void) {
 }
 
 static void broadcast_state(struct mosquitto *m, const char *status) {
+publish_retained(m, TOPIC_BOARD, g_board);
 
+    /* Creating buffer * on stack for the board
+    Again give it more bytes than needed*/
+    char pretty[256];
+    // Called from tictactoe.c to fill it with strings  X  | B1 | C1 and etc
+    format_board(g_board, pretty);
+
+    // publishing to broker with a different topic 
+    publish_retained(m, TOPIC_PRETTY_BOARD, pretty);
+
+    // Just used of holding the postions
+    char avail[64];
+    // Calling the avaible positions on the board from tictactoe
+    available_positions(g_board, avail);
+    
+    // Publishing the positions
+    publish_retained(m, TOPIC_AVAILABLE, avail);
+    publish_retained(m, TOPIC_STATUS, status);
+
+    
+    printf("\n=== status: %s ===\n", status);
+    printf("%s", pretty);
+    printf("Available: %s\n\n", avail);
 }
 
 static void start_game(struct mosquitto *m, GameMode mode) {
+    /* Clearing any previous game 
+    Basically resting all the squares */
     memset(g_board, EMPTY, BOARD_SIZE);
+    // Setting the players turn
     g_current = 'X';
     g_mode    = mode;
+    // Used to set the game status as active
     g_active  = 1;
+    
     printf("New game (mode=%s).\n", mode == MODE_1P ? "1P" : "2P");
     broadcast_state(m, turn_status());
 }
@@ -55,3 +83,4 @@ static void end_game(struct mosquitto *m, const char *status) {
     broadcast_state(m, status);
     printf("Game over: %s\n", status);
 }
+
