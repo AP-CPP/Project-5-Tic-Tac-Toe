@@ -1,3 +1,5 @@
+//  (void)obj; is used to ignore warnings
+
 // Importing libraries 
 #include <stdio.h>
 #include <stdlib.h>
@@ -111,37 +113,111 @@ static int parse_move(const char *payload, char *player, char *pos) {
 
 // Used to handle game moves
 static void handle_move(struct mosquitto *m, const char *payload) {
-    // First looking to see if there is an active game
+    // First looking to see if there is an active game 
+    char player; // player x or o
+    char pos[3]; // postion of board
+    int idx = -1;
+    // Fixed if statements and changed it to else if
+    const char *error_msg = NULL;
+
+    // Checks if a game is being played
     if (!g_active) {
-        //
+        error_msg = "no game in progress";
+    // Checks if move is formated correct like with : 
+    } else if (parse_move(payload, &player, pos) != 0) {
+        error_msg = "bad move format";
+    } else if (player != g_current) {
+        error_msg = "wrong player turn";
+    // Checks to see if the position is open
+    } else {
+        idx = label_to_index(pos);
+        if (idx < 0 || g_board[idx] != EMPTY) {
+            error_msg = "invalid or occupied position";
+        }
+    }
+    // If any fail then it tells the other clients that the last attempt was "Invaild"
+    if (error_msg) {
         publish_retained(m, TOPIC_STATUS, "INVALID");
-        printf("Move ignored: no game in progress.\n");
+        printf("Move ignored: %s. (Payload: %s)\n", error_msg, payload);
         return;
     }
-    char player; char pos[3];
-    if (parse_move(payload, &player, pos) != 0) {
-        publish_retained(m, TOPIC_STATUS, "INVALID");
-        printf("Bad move format: %s\n", payload);
-        return;
+    g_board[idx] = player; // move
+    
+    GameResult r = check_result(g_board); // checking the current board to see if there has been a win
+    // If there is a win / if there is still a game
+    if (r != RESULT_NONE) {
+        const char *results[] = { [RESULT_X_WIN]="X_WIN", [RESULT_O_WIN]="O_WIN", [RESULT_DRAW]="DRAW" }; // results 
+        end_game(m, results[r]); // winner and ends game
+        return; 
     }
-    if (player != g_current) {
-        publish_retained(m, TOPIC_STATUS, "INVALID");
-        printf("Not %c's turn (it's %c's).\n", player, g_current);
-        return;
-    }
-    int idx = label_to_index(pos);
-    if (idx < 0 || g_board[idx] != EMPTY) {
-        publish_retained(m, TOPIC_STATUS, "INVALID");
-        printf("Bad position: %s\n", pos);
-        return;
-    }
-
-    g_board[idx] = player;
-    GameResult r = check_result(g_board);
-    if (r == RESULT_X_WIN) { end_game(m, "X_WIN"); return; }
-    if (r == RESULT_O_WIN) { end_game(m, "O_WIN"); return; }
-    if (r == RESULT_DRAW)  { end_game(m, "DRAW");  return; }
-
-    g_current = (g_current == 'X') ? 'O' : 'X';
+    g_current = (g_current == 'X') ? 'O' : 'X'; // Will change from x to o and vice versa after a game
     broadcast_state(m, turn_status());
+}
+
+
+static void on_connect(struct mosquitto *m, void *obj, int rc) {
+    (void)obj;
+    // Checking to see if connection has been established
+    if (rc != 0) {
+        fprintf(stderr, "Connect failed: %s\n", mosquitto_connack_string(rc));
+        return;
+    }
+    // Monitorning / subing to topics
+    printf("Connected to broker.\n");
+    mosquitto_subscribe(m, NULL, TOPIC_CONTROL, 1);
+    mosquitto_subscribe(m, NULL, TOPIC_MOVE,    1);
+    publish_retained(m, TOPIC_STATUS, "WAITING");
+}
+
+static void on_message(struct mosquitto *m, void *obj, const struct mosquitto_message *msg) {
+    (void)obj;
+    // Handles payload message
+    char payload[64] = {0}; 
+    int n = msg->payloadlen < (int)sizeof(payload) - 1
+            ? msg->payloadlen : (int)sizeof(payload) - 1;
+// Explained previously similar idea
+    memcpy(payload, msg->payload, n);
+// See if the player wants to play alone or multiplayer
+    if (strcmp(msg->topic, TOPIC_CONTROL) == 0) {
+        if      (strncmp(payload, "NEW 1", 5) == 0) start_game(m, MODE_1P);
+        else if (strncmp(payload, "NEW 2", 5) == 0) start_game(m, MODE_2P);
+        // Error handle
+        else printf("Unknown control: %s\n", payload);
+    } else if (strcmp(msg->topic, TOPIC_MOVE) == 0) {
+        handle_move(m, payload);
+    }
+
+
+int main(void) {
+    // Password for mqtt
+    const char *password = getenv("MQTT_PASS");
+    if (!password) {
+        fprintf(stderr, "Set MQTT_PASS env var with the broker password.\n");
+        return 1;
+    }
+    // Explained previously 
+    memset(g_board, EMPTY, BOARD_SIZE);
+
+    // Mosquitto lib
+    mosquitto_lib_init();
+    struct mosquitto *m = mosquitto_new("tictactoe-server", true, NULL);
+    if (!m) { fprintf(stderr, "mosquitto_new failed\n"); return 1; }
+
+    // Config
+    mosquitto_username_pw_set(m, MQTT_USER, password);
+    mosquitto_connect_callback_set(m, on_connect);
+    mosquitto_message_callback_set(m, on_message);
+
+    // Broker connection
+    if (mosquitto_connect(m, BROKER_HOST, BROKER_PORT, 60) != MOSQ_ERR_SUCCESS) {
+        fprintf(stderr, "Cannot connect to %s:%d\n", BROKER_HOST, BROKER_PORT);
+        return 1;
+    }
+    
+    printf("Server starting. Ctrl+C to exit.\n");
+    mosquitto_loop_forever(m, -1, 1);
+
+    mosquitto_destroy(m);
+    mosquitto_lib_cleanup();
+    return 0;
 }
