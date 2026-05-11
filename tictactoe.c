@@ -65,3 +65,44 @@ GameResult check_result(const char *board) {
     }
     return RESULT_DRAW;
 }
+
+
+// Creating a interface to view the board
+void format_board(const char *board, char *out) {
+    /* Starting with new line
+    needed because of payload name would be on the same line */
+    strcpy(out, "\n");
+
+    // Setting up rows
+    for (int row = 0; row < 3; row++) {
+      // Creating a buffer for the rows and allowing it more headroom 
+        char line[64];
+      // 2d array
+        char cells[3][4];
+
+      // Checking whats open and what to display
+        for (int col = 0; col < 3; col++) {
+            int idx = row * 3 + col;
+          // Exact position
+            char c = board[idx];
+            if (c == EMPTY) {
+                cells[col][0] = 'A' + col;
+                cells[col][1] = '1' + row;
+                cells[col][2] = '\0';
+            } else {
+                cells[col][0] = ' ';
+                cells[col][1] = c;
+                cells[col][2] = '\0';
+            }
+        }
+
+      // prints out everything
+        snprintf(line, sizeof(line), " %s | %s | %s\n",
+                 cells[0], cells[1], cells[2]);
+        strcat(out, line);
+
+        if (row < 2) {
+            strcat(out, "----+----+----\n");
+        }
+    }
+}
