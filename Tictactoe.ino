@@ -1,5 +1,5 @@
 
-
+// Standar inputs
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include <Wire.h>
@@ -8,23 +8,24 @@
 
 
 
-
-const char *WIFI_SSID     = "Andrew";
+// Password for hotspot
+const char *WIFI_SSID = "Andrew";
 const char *WIFI_PASSWORD = "!Pasword1234!";
 
-
-const char *MQTT_HOST     = "apcpp.duckdns.org";
-const uint16_t MQTT_PORT  = 1883;
-const char *MQTT_USER     = "ledctl";
+// Connection to server
+const char *MQTT_HOST = "apcpp.duckdns.org";
+const uint16_t MQTT_PORT = 1883;
+const char *MQTT_USER = "ledctl";
 const char *MQTT_PASSWORD = "Andrew12345!";
-const char *CLIENT_ID     = "tictactoe-esp32";
+const char *CLIENT_ID = "tictactoe-esp32";
 
 
-
+// LCD
 #define SDA_PIN 13
 #define SCL_PIN 14
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 
+// Keypad
 const byte ROWS = 4;
 const byte COLS = 4;
 char keys[ROWS][COLS] = {
@@ -38,10 +39,10 @@ byte colPins[COLS] = {2, 21, 22, 23};
 Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);
 
 
-#define TOPIC_BOARD     "tictactoe/board"
-#define TOPIC_STATUS    "tictactoe/status"
+#define TOPIC_BOARD "tictactoe/board"
+#define TOPIC_STATUS "tictactoe/status"
 #define TOPIC_AVAILABLE "tictactoe/available"
-#define TOPIC_MOVE      "tictactoe/move"
+#define TOPIC_MOVE "tictactoe/move"
 
 
 
@@ -49,9 +50,9 @@ WiFiClient   wifiClient;
 PubSubClient mqtt(wifiClient);
 
 
-char g_board[10]  = "         ";   // 9 chars + null
+char g_board[10] = "         ";  
 char g_status[16] = "WAITING";
-char g_avail[64]  = "";
+char g_avail[64] = "";
 
 char pendingCol = 0;
 
@@ -59,17 +60,17 @@ char pendingCol = 0;
 void render() {
   lcd.clear();
 
-
+  // Instructions and status for user
   lcd.setCursor(0, 0);
-  if      (strcmp(g_status, "WAITING")  == 0) lcd.print("Waiting...");
-  else if (strcmp(g_status, "X_TURN")   == 0) lcd.print("X's turn");
-  else if (strcmp(g_status, "O_TURN")   == 0) lcd.print("YOUR TURN (O)");
+  if      (strcmp(g_status, "WAITING") == 0) lcd.print("Waiting...");
+  else if (strcmp(g_status, "X_TURN") == 0) lcd.print("X's turn");
+  else if (strcmp(g_status, "O_TURN") == 0) lcd.print("YOUR TURN (O)");
   else if (strcmp(g_status, "BOT_TURN") == 0) lcd.print("Bot's turn");
-  else if (strcmp(g_status, "X_WIN")    == 0) lcd.print("X wins!");
-  else if (strcmp(g_status, "O_WIN")    == 0) lcd.print("O wins!");
-  else if (strcmp(g_status, "DRAW")     == 0) lcd.print("Draw!");
+  else if (strcmp(g_status, "X_WIN") == 0) lcd.print("X wins!");
+  else if (strcmp(g_status, "O_WIN") == 0) lcd.print("O wins!");
+  else if (strcmp(g_status, "DRAW") == 0) lcd.print("Draw!");
   else if (strcmp(g_status, "INVALID")  == 0) lcd.print("Invalid move");
-  else                                         lcd.print(g_status);
+  else lcd.print(g_status);
 
 
   lcd.setCursor(0, 1);
@@ -81,12 +82,12 @@ void render() {
       lcd.print(pendingCol);
       lcd.print(", press 1-3");
     }
-  } else if (strcmp(g_status, "X_TURN")   == 0 ||
+  } else if (strcmp(g_status, "X_TURN") == 0 ||
              strcmp(g_status, "BOT_TURN") == 0) {
     lcd.print("Wait your turn");
   } else if (strcmp(g_status, "X_WIN") == 0 ||
              strcmp(g_status, "O_WIN") == 0 ||
-             strcmp(g_status, "DRAW")  == 0) {
+             strcmp(g_status, "DRAW") == 0) {
     lcd.print("Press # to new");
   } else {
     lcd.print(g_avail);
@@ -95,7 +96,7 @@ void render() {
 
 
 
-
+// Server response
 void onMqttMessage(char *topic, byte *payload, unsigned int length) {
   
   char buf[128];
