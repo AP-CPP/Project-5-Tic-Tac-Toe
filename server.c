@@ -18,6 +18,7 @@
 #define TOPIC_AVAILABLE "tictactoe/available"
 
 
+// Game mode 
 typedef enum { MODE_NONE, MODE_1P, MODE_2P } GameMode;
 
 static char     g_board[BOARD_SIZE];   // current 9-character board
@@ -27,4 +28,10 @@ static int      g_active  = 0;         // 1 if a game is in progress
 
 static void publish_retained(struct mosquitto *m, const char *topic, const char *payload) {
     mosquitto_publish(m, NULL, topic, (int)strlen(payload), payload, 1, true);
+}
+
+
+static const char *turn_status(void) {
+    if (g_mode == MODE_1P && g_current == 'O') return "BOT_TURN";
+    return (g_current == 'X') ? "X_TURN" : "O_TURN";
 }
