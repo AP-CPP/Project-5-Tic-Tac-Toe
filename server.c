@@ -35,3 +35,23 @@ static const char *turn_status(void) {
     if (g_mode == MODE_1P && g_current == 'O') return "BOT_TURN";
     return (g_current == 'X') ? "X_TURN" : "O_TURN";
 }
+
+static void broadcast_state(struct mosquitto *m, const char *status) {
+
+}
+
+static void start_game(struct mosquitto *m, GameMode mode) {
+    memset(g_board, EMPTY, BOARD_SIZE);
+    g_current = 'X';
+    g_mode    = mode;
+    g_active  = 1;
+    printf("New game (mode=%s).\n", mode == MODE_1P ? "1P" : "2P");
+    broadcast_state(m, turn_status());
+}
+
+static void end_game(struct mosquitto *m, const char *status) {
+    g_active = 0;
+    g_mode   = MODE_NONE;
+    broadcast_state(m, status);
+    printf("Game over: %s\n", status);
+}
