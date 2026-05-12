@@ -292,3 +292,38 @@ static void update_game_screen(void) {
         }
     }
 }
+int main(void) {
+    g_mqtt_pass = getenv("MQTT_PASS");
+    if (!g_mqtt_pass) {
+        fprintf(stderr, "Set the MQTT_PASS env var with the broker password.\n");
+        return 1;
+    }
+
+    InitWindow(WIN_W, WIN_H, "Tic-Tac-Toe");
+    SetTargetFPS(60);
+
+    while (!WindowShouldClose()) {
+        
+        if (g_screen == SCREEN_CONNECT) update_connect_screen();
+        if (g_screen == SCREEN_GAME)    update_game_screen();
+
+      
+        BeginDrawing();
+        ClearBackground(RAYWHITE);
+
+        if      (g_screen == SCREEN_CONNECT) draw_connect_screen();
+        else if (g_screen == SCREEN_MODE)    draw_mode_screen();
+        else if (g_screen == SCREEN_GAME)    draw_game_screen();
+
+        EndDrawing();
+    }
+
+    if (g_mosq) {
+        mosquitto_loop_stop(g_mosq, true);
+        mosquitto_disconnect(g_mosq);
+        mosquitto_destroy(g_mosq);
+    }
+    mosquitto_lib_cleanup();
+    CloseWindow();
+    return 0;
+}
